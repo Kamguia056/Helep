@@ -1,0 +1,75 @@
+# Global values — override per environment with -f prod-values.yaml
+global:
+  imageRegistry: ""       # set to your registry, e.g. "ghcr.io/yourorg/"
+  imagePullPolicy: IfNotPresent
+  kafkaBootstrap: "helep-kafka-kafka-bootstrap:9092"
+  jwtSecretName: "helep-jwt-secret"   # K8s Secret key: JWT_SECRET
+
+# ── per-service overrides ──────────────────────────────────────────────────
+user-service:
+  enabled: true
+  image:
+    tag: latest
+  replicaCount: 2
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+sos-service:
+  enabled: true
+  image:
+    tag: latest
+  replicaCount: 2
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 60
+
+dispatch-service:
+  enabled: true
+  image:
+    tag: latest
+  replicaCount: 2
+  matcher: nearest          # nearest | credibility | round_robin
+  resources:
+    requests: { cpu: "150m", memory: "128Mi" }
+    limits:   { cpu: "600m", memory: "256Mi" }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+notification-service:
+  enabled: true
+  image:
+    tag: latest
+  replicaCount: 2
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "400m", memory: "256Mi" }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+analytics-service:
+  enabled: true
+  image:
+    tag: latest
+  replicaCount: 1
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "400m", memory: "256Mi" }
+  autoscaling:
+    enabled: false

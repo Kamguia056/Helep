@@ -1,0 +1,9 @@
+---
+# Namespace isolé pour tous les composants HELEP
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helep
+  labels:
+    app.kubernetes.io/part-of: helep
+    pod-security.kubernetes.io/enforce: baseline

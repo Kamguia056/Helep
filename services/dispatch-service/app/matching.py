@@ -1,8 +1,9 @@
 """Pattern: Strategy. Plug-in matching algorithms for choosing a responder.
 
-Switch via env MATCHER=nearest|credibility.
+Switch via env MATCHER=nearest|credibility|round_robin.
 """
 from __future__ import annotations
+import itertools
 import math
 import os
 from typing import Iterable, Protocol
@@ -29,6 +30,7 @@ class Matcher(Protocol):
 
 
 class NearestMatcher:
+    """Pick the geographically closest free responder using the Haversine formula."""
     def pick(self, victim_lat, victim_lon, responders):
         best = None
         best_d = float("inf")
@@ -54,8 +56,39 @@ class CredibilityWeightedMatcher:
         return {"id": best["id"], "score": best_score}
 
 
+# -- lines 50-65: RoundRobinMatcher (student-added third strategy) -----------
+class RoundRobinMatcher:
+    """Distribute incidents evenly across all free responders, ignoring location.
+
+    Uses a module-level cycling iterator so the selection persists across calls
+    within the same process lifetime. This prevents any single responder from
+    being overloaded when incidents arrive in rapid succession and distances
+    are roughly equal (e.g. a single city grid).
+
+    Trade-off vs NearestMatcher: response time may be slightly higher, but
+    workload is perfectly balanced — useful for drills or when GPS is imprecise.
+    """
+    _counter: itertools.cycle | None = None
+    _last_ids: list[str] = []
+
+    def pick(self, victim_lat: float, victim_lon: float, responders: Iterable) -> dict | None:
+        pool = list(responders)
+        if not pool:
+            return None
+        # Rebuild the cycle only when the responder pool changes.
+        ids = [r["id"] for r in pool]
+        if ids != self._last_ids:
+            self.__class__._last_ids = ids
+            self.__class__._counter = itertools.cycle(range(len(pool)))
+        idx = next(self.__class__._counter) % len(pool)
+        chosen = pool[idx]
+        return {"id": chosen["id"], "round_robin_index": idx}
+
+
 def matcher() -> Matcher:
     name = os.getenv("MATCHER", "nearest").lower()
     if name == "credibility":
         return CredibilityWeightedMatcher()
+    if name == "round_robin":
+        return RoundRobinMatcher()
     return NearestMatcher()

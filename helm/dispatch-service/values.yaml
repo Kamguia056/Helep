@@ -1,0 +1,25 @@
+replicaCount: 2
+image:
+  repository: dispatch-service
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 8003
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+persistence:
+  size: 1Gi
+  storageClass: standard
+env:
+  SERVICE_PORT: "8003"

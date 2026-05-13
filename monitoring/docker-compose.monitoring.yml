@@ -1,0 +1,24 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ../prometheus.dev.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - default
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3001:3000" # On change 3000 en 3001 ici
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - default

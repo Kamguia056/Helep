@@ -1,0 +1,12 @@
+---
+# ConfigMap shared by all services — non-sensitive config only.
+# Sensitive values (JWT_SECRET) live in helep-jwt-secret (Secret).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: helep-config
+  namespace: helep
+data:
+  KAFKA_BOOTSTRAP: "helep-kafka-kafka-bootstrap.helep.svc.cluster.local:9092"
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"

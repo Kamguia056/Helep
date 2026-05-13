@@ -1,0 +1,26 @@
+# helep — Helm Umbrella Chart
+apiVersion: v2
+name: helep
+description: >
+  HELEP emergency-response platform. Umbrella chart that pulls in all five
+  microservices, Strimzi-managed Kafka, Prometheus, and Grafana.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: user-service
+    version: "1.0.0"
+    repository: "file://../user-service"
+  - name: sos-service
+    version: "1.0.0"
+    repository: "file://../sos-service"
+  - name: dispatch-service
+    version: "1.0.0"
+    repository: "file://../dispatch-service"
+  - name: notification-service
+    version: "1.0.0"
+    repository: "file://../notification-service"
+  - name: analytics-service
+    version: "1.0.0"
+    repository: "file://../analytics-service"

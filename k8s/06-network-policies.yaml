@@ -1,0 +1,104 @@
+---
+# NetworkPolicy — default-deny all ingress within the helep namespace,
+# then explicitly allow only necessary paths.
+# This satisfies the Confidentiality NFR (SRS §3): services cannot
+# talk to each other except through the approved Kafka broker.
+
+# 1. Deny all traffic by default in the helep namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: helep
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# 2. Allow the nginx Ingress controller to reach each microservice.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: helep
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8001
+        - protocol: TCP
+          port: 8002
+        - protocol: TCP
+          port: 8003
+        - protocol: TCP
+          port: 8004
+        - protocol: TCP
+          port: 8005
+---
+# 3. Allow Prometheus to scrape /metrics on all services.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: helep
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8001
+        - protocol: TCP
+          port: 8002
+        - protocol: TCP
+          port: 8003
+        - protocol: TCP
+          port: 8004
+        - protocol: TCP
+          port: 8005
+---
+# 4. Allow services to reach Kafka broker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-egress
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: helep
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: helep-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53

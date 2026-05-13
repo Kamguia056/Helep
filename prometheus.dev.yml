@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'helep-services'
+    static_configs:
+      - targets:
+        - 'user-service:8001'
+        - 'sos-service:8002'
+        - 'dispatch-service:8003'
+        - 'notification-service:8004'
+        - 'analytics-service:8005'

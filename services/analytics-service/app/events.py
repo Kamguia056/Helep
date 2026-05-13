@@ -3,7 +3,7 @@
 Patterns:
   - Pub/Sub (Kafka topics + consumer groups)
   - Outbox-lite (publish + db-write live in same async block in main.py)
-  - Circuit breaker stub (TODO: student completes)
+  - Circuit breaker (COMPLETED: full CLOSED / OPEN / HALF_OPEN state machine)
 
 Partition keying:
   Every saga-critical publish should pass key=<incident_id> (or <user_id>).
@@ -14,6 +14,7 @@ Partition keying:
 from __future__ import annotations
 import json
 import os
+import time
 from typing import Awaitable, Callable, Iterable
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
@@ -54,23 +55,73 @@ async def health() -> bool:
         return False
 
 
-# ---- Circuit breaker stub (student to complete) ----
+# ---- Circuit Breaker — CLOSED / OPEN / HALF_OPEN state machine ----
+# States:
+#   CLOSED    — normal operation; failures are counted.
+#               When fails >= fail_threshold → transition to OPEN.
+#   OPEN      — all calls are rejected immediately.
+#               After reset_after_s seconds → transition to HALF_OPEN.
+#   HALF_OPEN — one probe call is allowed through.
+#               If it succeeds → back to CLOSED (fail counter reset).
+#               If it fails   → back to OPEN (timer restarted).
 class CircuitBreaker:
+    _CLOSED = "CLOSED"
+    _OPEN = "OPEN"
+    _HALF_OPEN = "HALF_OPEN"
+
     def __init__(self, fail_threshold: int = 5, reset_after_s: float = 10.0):
         self.fail_threshold = fail_threshold
         self.reset_after_s = reset_after_s
         self.fails = 0
         self.opened_at: float | None = None
+        self._state = self._CLOSED
 
+    # -- line 68: core allow() gate ------------------------------------------
     def allow(self) -> bool:
-        # TODO (student): implement open/half-open/closed state machine
-        return True
+        """Return True when the call should proceed, False to short-circuit."""
+        if self._state == self._CLOSED:
+            # Normal operation — always allow.
+            return True
 
+        if self._state == self._OPEN:
+            # Check if the cool-down window has expired.
+            if self.opened_at is not None and (time.monotonic() - self.opened_at) >= self.reset_after_s:
+                # Transition to HALF_OPEN: let exactly one probe through.
+                self._state = self._HALF_OPEN
+                return True
+            # Still within the open window — reject the call.
+            return False
+
+        if self._state == self._HALF_OPEN:
+            # Probe call is already in flight; reject any concurrent requests.
+            return False
+
+        return True  # unreachable safety net
+
+    # -- line 86: success path ------------------------------------------------
     def record_success(self) -> None:
+        """Called after a successful publish. Resets the breaker if recovering."""
         self.fails = 0
+        self.opened_at = None
+        self._state = self._CLOSED  # HALF_OPEN → CLOSED on probe success
 
+    # -- line 93: failure path ------------------------------------------------
     def record_failure(self) -> None:
+        """Called after a publish exception. May open or re-open the breaker."""
         self.fails += 1
+        if self._state == self._HALF_OPEN:
+            # Probe failed — go back to OPEN and restart the timer.
+            self._state = self._OPEN
+            self.opened_at = time.monotonic()
+        elif self._state == self._CLOSED and self.fails >= self.fail_threshold:
+            # Threshold crossed — open the breaker.
+            self._state = self._OPEN
+            self.opened_at = time.monotonic()
+
+    @property
+    def state(self) -> str:
+        """Expose current state name for logging / metrics."""
+        return self._state
 
 
 _breaker = CircuitBreaker()
@@ -79,7 +130,7 @@ _breaker = CircuitBreaker()
 async def publish(topic: str, event: dict, key: str | None = None) -> None:
     """Outbox-lite: caller should db-write THEN await publish() in same async block."""
     if not _breaker.allow():
-        raise RuntimeError(f"circuit-open: {topic}")
+        raise RuntimeError(f"circuit-open [{_breaker.state}]: {topic}")
     try:
         p = await producer()
         await p.send_and_wait(topic, value=event, key=key)
